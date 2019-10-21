@@ -7,11 +7,11 @@ Help param
 * Usage of FileProxy2:
 
   - debug
-        > 是否启用log调试模式(true或false), 默认为false
+        是否启用log调试模式(true或false), 默认为false
   - listen string
-        > 设置监听地址 (default "[::]:8099")
+        设置监听地址 (default "[::]:8099")
   - timeout int
-        > 下载链接超时时间(秒) (default 3600)"""
+        下载链接超时时间(秒) (default 3600)"""
 
 Examples
 
