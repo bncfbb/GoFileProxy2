@@ -1,7 +1,7 @@
-##What's GoProxy2
+#What's GoProxy2
 GoProxy2 is a reverse proxy for speeding up file download program.
 
-##Get Start
+#Get Start
 Help param
 
 * Usage of FileProxy2:
