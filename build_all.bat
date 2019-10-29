@@ -1,5 +1,5 @@
 @echo off
-set /p appname=«Î ‰»Îapp√˚≥∆: 
+set /p appname=Please input the project name:
 
 set GOOS=windows
 set GOARCH=amd64
