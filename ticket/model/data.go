@@ -7,4 +7,5 @@ type TicketData struct {
 	Cookie             string  //自定义Cookies
 	StartTimeStamp     int64  //创建任务开始时间戳
 	ExpireTimeStamp    int64  //Token过期时间戳
+	DownloadCounter    int64  //下载次数计数
 }

@@ -14,6 +14,7 @@
 <link href="css/style.css" rel="stylesheet">
 <!-- Loading jquery -->
 <script src="js/jquery-1.11.0.min.js" type="text/javascript"></script>
+<script src="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script>
 <script>
 	String.prototype.startWith = function(str) {     
 		var reg = new RegExp("^"+str);     
@@ -51,6 +52,8 @@
 		var postdata = {}
 
 		postdata.url = url;
+		postdata.verify = $('#verify-value').val();
+
 		if (!isEmpty(name))
 			postdata.filename = name;
 		if (!isEmpty(cookie))
@@ -60,7 +63,7 @@
 
 		postdata.urldecode = $('#checkbox-urldecode').prop('checked');
   		$.ajax({
-			url: '/api/getToken',
+			url: '/api/token/generate',
 			type: 'POST',
 			data: JSON.stringify(postdata),
 			async: false,
@@ -85,19 +88,42 @@
 </script>
 </head>
 <body>
+	
 	<div id="box"></div>
 	<div class="container">
 	<div class="header clearfix">
 	  <h3 class="title">文件下载代理服务</h3>
 	</div>
+	
+	<div class="modal fade modalIndex" id="captchaModal"  role="dialog">
+		<div class="modal-dialog" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h4 class="modal-title" id="myModalLabel">输入验证码</h4>
+				</div>
+				<div class="modal-body">
+					<div class="input-group">
+						<img id="verify-img" onclick='$("#verify-img").attr("src", "/api/captcha/image?_="+new Date().getTime()); '>
+						<input type="search" class="form-control" id="verify-value" placeholder="请输入验证码">
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-default" data-dismiss="modal">关闭</button>
+					<button id="query-btn" type="button" class="btn btn-primary">确认</button>
+				</div>
+			</div>
+		</div>
+	</div>
 
 	<div class="jumbotron">
+			
 		<div class="form-group form-group-search">
 		  <div class="input-group">
 		  	<input type="search" class="form-control" id="search" placeholder="请输入URL">
-		    <span id="query-btn" class="input-group-addon search-btn btn btn-success">GO</span>
+		    <span id="go-button" class="input-group-addon search-btn btn btn-success">GO</span>
 			</div>
 		</div>
+		
 
 		<div id="alert-failed" class="alert alert-danger">
 			<strong id="failed-msg"></strong>
@@ -124,7 +150,7 @@
 			</label>&nbsp;&nbsp;
 			<label class="checkbox" for="checkbox-header">
 					<input type="checkbox" value="" id="checkbox-header" data-toggle="checkbox" class="custom-checkbox"><span class="icons"><span class="icon-unchecked"></span><span class="icon-checked"></span></span>
-					自定义Header
+					自定义请求头
 			</label>&nbsp;&nbsp;
 			
 		</div>
@@ -157,12 +183,17 @@
 			
 		</div> -->
 	</div>
+		
 	<script>
 	$(document).ready(function () {
+		$.get("/api/ver",function(data,status){
+			$('#ver').html(data.version);
+    	});
+
 		$('#input-group-custom > input').hide();
 		$('#checkbox-urldecode').prop("checked",true);
 
-		$('#query-btn').click(function() {
+		$('#go-button').click(function() { 
 			var url = $('#search').val();
 			if (url == "" || url == "http://" || url == "https://") {
 				showFailed("请输入URL！");
@@ -174,7 +205,22 @@
 				return;
 			}
 
+			$('#verify-value').val('');
+			$('#captchaModal').modal('show');
+			$("#verify-img").attr("src", "/api/captcha/image?_="+new Date().getTime()); 
+		});
+
+		$('#query-btn').click(function() { 
+			var verifyCode = $('#verify-value').val();
+			if (verifyCode.length != 4) {
+				alert("验证码长度必须为4位");
+				return;
+			}
+			$('#captchaModal').modal('hide');
+
 			$('#result-info').hide('500');
+
+			var url = $('#search').val();
 			
 			var name = "";
 			var cookie = "";
@@ -277,7 +323,13 @@
 			$addButton: $('#add')
 		});
 	</script>
-  <p class="lead copyright">Project GoFileProxy V2.0</p>
+	<div id="footer" class="jumbotron">
+		<iframe frameborder="no" border="0" marginwidth="0" marginheight="0" width="65%" height=86 src="//music.163.com/outchain/player?type=2&id=496869422&auto=0&height=66"></iframe>
+		<p class="lead copyright">
+			<svg class="octicon octicon-mark-github v-align-middle" height="32" viewBox="0 0 16 16" version="1.1" width="32" aria-hidden="true"><path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+			<a target="_blank" href="https://github.com/bncfbb/GoFileProxy2">Project GoFileProxy <strong id="ver"></strong></a>
+		</p>
+	</div>
 </div>
 </body>
 </html>

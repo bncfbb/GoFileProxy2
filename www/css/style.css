@@ -17,9 +17,16 @@ body {
   right: 0; 
   bottom: 0; 
   z-index: -1;
-  background-attachment: fixed,             fixed;
-  background-image: url("../img/overlay.png"), url("../img/bg.jpg");
-  background-size: auto,              cover;
+color: white;
+            background-color: #c4918a !important;
+            background-image: url(""), -moz-linear-gradient(45deg, #c4918a 20%, #6093c4 80%);
+            background-image: url(""), -webkit-linear-gradient(45deg, #c4918a 20%, #6093c4 80%);
+            background-image: url(""), -ms-linear-gradient(45deg, #c4918a 20%, #6093c4 80%);
+            background-image: url(""), linear-gradient(45deg, #c4918a 20%, #6093c4 80%);
+            background-size: 100px 100px, cover, cover;
+            background-position: top left, center center, bottom center;
+            background-attachment: fixed, fixed, fixed;
+
 }
 a{text-decoration: none;outline: none;
 /*a:hover,a:focus{color:#74777b;}*/
@@ -192,10 +199,16 @@ a:hover {
 
 .copyright {
   color: #fff;
+  text-align: center;
 }
-.copyright:before {
-  content: "© ";
+
+.copyright a {
+  color: #202020;
 }
+.copyright a:hover {
+  color: #045AFF;
+}
+
 .title {
   color: #0285f0;
 }
@@ -222,3 +235,19 @@ a:hover {
   text-align: left;
 }
 
+.modal-open .modal-backdrop {
+  opacity: 0.6 !important;
+}
+  
+.modal-open .modal {
+  opacity: 1.0 !important;
+}
+
+.modal.fade.in{
+  margin-top:90px;  
+}
+
+#footer {
+  padding: 2rem 1rem !important;
+  text-align:center;
+}

@@ -8,14 +8,24 @@ import (
 	"flag"
 	"github.com/kataras/iris"
 	"github.com/kataras/iris/context"
+	"github.com/kataras/iris/sessions"
+	"github.com/mojocn/base64Captcha"
 	"log"
 	"net/http"
 	"net/url"
+	"runtime"
 	"strconv"
+	"sync"
 )
 
 const (
-	Version = "2.0"
+	Version = "2.0.1"
+)
+
+var (
+	cookieNameForSessionID ="sessionid"
+	sess = sessions.New(sessions.Config{Cookie:cookieNameForSessionID})
+	counterLock sync.Mutex
 )
 
 func main() {
@@ -33,6 +43,7 @@ func main() {
 	app := iris.New()
 	app.Logger().Info("下载链接超时时间 -> ", *ticketTimeout)
 
+	//app.Logger().SetLevel("debug")
 	if *isDebug {
 		app.Logger().SetLevel("debug")
 		app.Logger().Info("开启log debug模式")
@@ -46,9 +57,49 @@ func main() {
 	
 	api := app.Party("/api")
 	{
-		//获取下载地址接口
-		api.Post("/getToken", func(context context.Context) {
-			//session := sess.NewSessionManager(context)
+		//验证码图片接口
+		api.Get("/captcha/image", func(context context.Context) {
+			session := sess.Start(context)
+			//config struct for Character
+			var configC = base64Captcha.ConfigCharacter{
+				Height:             40,
+				Width:              160,
+				//const CaptchaModeNumber:数字,CaptchaModeAlphabet:字母,CaptchaModeArithmetic:算术,CaptchaModeNumberAlphabet:数字字母混合.
+				Mode:               base64Captcha.CaptchaModeNumberAlphabet,
+				ComplexOfNoiseText: base64Captcha.CaptchaComplexLower,
+				ComplexOfNoiseDot:  base64Captcha.CaptchaComplexLower,
+				IsShowHollowLine:   false,
+				IsShowNoiseDot:     false,
+				IsShowNoiseText:    false,
+				IsShowSlimeLine:    false,
+				IsShowSineLine:     false,
+				CaptchaLen:         4,
+			}
+			//创建字符公式验证码.
+			//GenerateCaptcha 第一个参数为空字符串,包会自动在服务器一个随机种子给你产生随机uiid.
+			idKey, cap := base64Captcha.GenerateCaptcha("", configC)
+
+			app.Logger().Debug(idKey)
+			session.Set("captchakey", idKey)
+			cap.WriteTo(context)
+		})
+
+		//用于测试验证码接口
+		api.Get("/captcha/verify/{code:string}", func(context context.Context) {
+			session := sess.Start(context)
+			captchaKey := session.GetString("captchakey")
+			code := context.Params().Get("code")
+
+			app.Logger().Debug("capid->", captchaKey, "  value->", code)
+			if base64Captcha.VerifyCaptcha(captchaKey, code) {
+				showJSON(context, 0, "ok", nil)
+				return
+			}
+			showJSON(context, 20000, "验证码错误", nil)
+		})
+
+		//生成token获取下载地址接口
+		api.Post("/token/generate", func(context context.Context) {
 
 			//读取POST JSON表单参数
 			params := make(map[string]interface{})
@@ -56,6 +107,31 @@ func main() {
 				app.Logger().Error(err)
 			}
 			app.Logger().Info(params)
+
+			//开始操作session
+			session := sess.Start(context)
+			//获取session中保存的验证码captchaKey
+			captchaKey := session.GetString("captchakey")
+
+			if len(captchaKey)==0 {
+				showJSON(context, 20001, "请先请求验证码图像", nil)
+				return
+			}
+
+			if params["verify"]==nil || len(params["verify"].(string))==0 {
+				showJSON(context, 20002, "缺少验证码参数", nil)
+				return
+			}
+			//获取POST请求提交过来的验证码值参数
+			verifyCode := params["verify"].(string)
+
+			app.Logger().Debug("capid->", captchaKey, "  value->", verifyCode)
+
+			//判断验证码是否正确
+			if !base64Captcha.VerifyCaptcha(captchaKey, verifyCode) {
+				showJSON(context, 20000, "验证码错误", nil)
+				return
+			}
 
 			//判断url参数是否设置
 			if params["url"] == nil {
@@ -112,11 +188,10 @@ func main() {
 
 		})
 
-		
-		api.Get("/getTokenInfo", func(context context.Context) {
+		//获取token详细信息接口
+		api.Get("/token/info/{token:string}", func(context context.Context) {
 			//session := sess.NewSessionManager(context)
-
-			token := context.URLParam("token")
+			token := context.Params().Get("token")
 
 			t := tm.GetTicket(token)
 			if t == nil {
@@ -126,6 +201,13 @@ func main() {
 
 			showJSON(context, 0, "ok", func(params map[string]interface{}) {
 				params["data"] = t
+			})
+		})
+
+		//Get Version API
+		api.Get("/ver", func(context context.Context) {
+			showJSON(context, 0, "ok", func(mmap map[string]interface{}) {
+				mmap["version"] = Version
 			})
 		})
 	}
@@ -206,17 +288,22 @@ func main() {
 			context.Header("content-disposition", "attachment; filename=\""+t.FileName+"\"")
 		}
 
-		app.Logger().Info("token->", token, ", 开始转发数据流")
+		app.Logger().Debug("token->", token, ", 开始转发数据流")
 		//len, err := io.Copy(context, resp.Body)
 		len, err := io2.Copy(context, resp.Body)
 		if err != nil {
-			app.Logger().Info("token->", token, ", IO错误, 详细信息->", err.Error())
+			app.Logger().Debug("token->", token, ", IO错误, 详细信息->", err.Error())
 		}
 
-		app.Logger().Info("token->", token, ", 数据流关闭, len->", len)
+		app.Logger().Debug("token->", token, ", 数据流关闭, len->", len)
+
+		counterLock.Lock()
+		t.DownloadCounter++
+		counterLock.Unlock()
 	})
 
 	//api.Get("/download/{token:string}/{filename:string}", download)
+	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	app.StaticWeb("/", "./www")
 
