@@ -1,8 +1,8 @@
-package ticket
+package controller
 
 import (
 	"../timer"
-	"./model"
+	"../model"
 	"crypto/md5"
 	"encoding/hex"
 	"log"
@@ -17,7 +17,7 @@ type TicketManager struct {
 }
 
 func (tm *TicketManager) GenerateTicket(data *model.TicketData) string {
-	ticket := MD5(data.URL + strconv.FormatInt(time.Now().UTC().UnixNano(), 10) + strconv.FormatFloat(rand.Float64(), 'f', 2, 64))[:16]
+	ticket := MD5(data.URL + strconv.FormatInt(time.Now().UTC().UnixNano(), 10) + strconv.FormatFloat(rand.Float64(), 'f', 2, 64))
 
 	data.StartTimeStamp = time.Now().Unix()
 	data.ExpireTimeStamp = data.StartTimeStamp + (int64)(tm.ticketInvalidTime)

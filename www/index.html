@@ -14,7 +14,7 @@
 <link href="css/style.css" rel="stylesheet">
 <!-- Loading jquery -->
 <script src="js/jquery-1.11.0.min.js" type="text/javascript"></script>
-<script src="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script>
+<script src="js/bootstrap.min.js"></script>
 <script>
 	String.prototype.startWith = function(str) {     
 		var reg = new RegExp("^"+str);     
@@ -233,11 +233,11 @@
 				} else
 					name = text;
 
-			} else {
+			} /*else {
 				var a = url.lastIndexOf('/');
 				if (a != -1 && url.indexOf('.', a) != -1)
 					name = url.substring(a + 1, url.length);
-			}
+			}*/
 
 
 			if ($('#checkbox-cookie').prop('checked')) {
@@ -262,12 +262,11 @@
 
 			getToken(url, name, $('#input-cookie').val(), headerData2Json(), {
 				success: function(result) {
-					console.log(result);
-					//window.open("/api/proxy.do?token=" + result);
 					$('#result-info').show('500');
 
-					var url = window.location.protocol+"//"+window.location.host+"/api/download/"+result.token;
+					var url = window.location.protocol+"//"+window.location.host+"/api/stream/"+result.token;
 					var fn = result.data.FileName;
+
 					console.log("fn -> " + fn);
 					$('#result-url').attr('href', url);
 					$('#result-url').text(url);
@@ -277,8 +276,8 @@
 						return d.toLocaleDateString().replace(/\//g, "-") + " " + d.toTimeString().substr(0, 8);
 					}
 
-					$('#result-create').text(ts2Date(result.data.StartTimeStamp));
-					$('#result-expire').text(ts2Date(result.data.ExpireTimeStamp));
+					$('#result-create').text(ts2Date(result.data.generate_timestamp));
+					$('#result-expire').text(ts2Date(result.data.expire_timestamp));
 					
 		  		}, 
 		  		error: function(msg) {

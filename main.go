@@ -1,10 +1,9 @@
 package main
 
 import (
+	"./controller"
 	io2 "./io"
-	"./ticket"
-	"./ticket/model"
-	"encoding/json"
+	"./model"
 	"flag"
 	"github.com/kataras/iris"
 	"github.com/kataras/iris/context"
@@ -19,7 +18,7 @@ import (
 )
 
 const (
-	Version = "2.0.1"
+	Version = "2.0.2"
 )
 
 var (
@@ -38,12 +37,12 @@ func main() {
 	flag.Parse()
 
 	//设置下载链接超时时间
-	tm := ticket.NewTicketManager(*ticketTimeout)
+	tm := controller.NewTicketManager(*ticketTimeout)
 
 	app := iris.New()
 	app.Logger().Info("下载链接超时时间 -> ", *ticketTimeout)
 
-	//app.Logger().SetLevel("debug")
+	app.Logger().SetLevel("debug")
 	if *isDebug {
 		app.Logger().SetLevel("debug")
 		app.Logger().Info("开启log debug模式")
@@ -100,13 +99,15 @@ func main() {
 
 		//生成token获取下载地址接口
 		api.Post("/token/generate", func(context context.Context) {
+			var filename, cookie string
+			var headers []map[string]interface{}
 
 			//读取POST JSON表单参数
-			params := make(map[string]interface{})
-			if err := context.ReadJSON(&params); err != nil {
-				app.Logger().Error(err)
+			params, err := controller.NewParamReader(context)
+			if err != nil {
+				showJSON(context, 20004, "POST参数解析失败", nil)
+				return
 			}
-			app.Logger().Info(params)
 
 			//开始操作session
 			session := sess.Start(context)
@@ -118,12 +119,13 @@ func main() {
 				return
 			}
 
-			if params["verify"]==nil || len(params["verify"].(string))==0 {
+
+			//获取POST请求提交过来的验证码值参数
+			verifyCode, success := params.GetJsonParamString("verify")
+			if !success {
 				showJSON(context, 20002, "缺少验证码参数", nil)
 				return
 			}
-			//获取POST请求提交过来的验证码值参数
-			verifyCode := params["verify"].(string)
 
 			app.Logger().Debug("capid->", captchaKey, "  value->", verifyCode)
 
@@ -133,15 +135,15 @@ func main() {
 				return
 			}
 
+			paramUrl, success := params.GetJsonParamString("url")
 			//判断url参数是否设置
-			if params["url"] == nil {
+			if !success {
 				showJSON(context, 10000, "缺少URL参数", nil)
 				return
 			}
-			paramUrl := params["url"].(string)
 
 			//如果urldecode==true则进行URL解码
-			if params["urldecode"] != nil && params["urldecode"] == true {
+			if params.GetJsonParamBool("urldecode") {
 				unescapeUrl, err := url.QueryUnescape(paramUrl)
 				if err != nil {
 					showJSON(context, 10010, "url参数解码失败  详细信息->"+err.Error(), nil)
@@ -150,30 +152,30 @@ func main() {
 				app.Logger().Debug(unescapeUrl)
 				paramUrl = unescapeUrl
 			}
-			if params["headers"] != nil {
-				app.Logger().Info("Set session data: Custom Headers -> ", params["headers"])
-			}
 
-			var filename, cookie string
-			var headers []map[string]interface{}
-			if params["filename"] != nil {
-				filename = params["filename"].(string)
+			temp, success := params.GetJsonParamString("filename")
+			if success {
+				filename = temp
 			}
 
 			//如果headers(自定义协议头)不为空则进行json解码
-			if params["headers"] != nil {
-				//headers = params["headers"].(map[string]string)
-				log.Print([]byte(params["headers"].(string)), params["headers"].(string))
-				err := json.Unmarshal([]byte(params["headers"].(string)), &headers)
+			if params.IsValidParam("headers") {
+				h, err := params.GetJsonParamToMap("headers")
 				if err != nil {
 					showJSON(context, 10011, "header json参数解码失败  详细信息->"+err.Error(), nil)
 					return
 				}
-			}
-			if params["cookie"] != nil {
-				cookie = params["cookie"].(string)
+				app.Logger().Info("Set session data: Custom Headers -> ", h)
+				headers = h
 			}
 
+			//自定义cookie
+			temp, success = params.GetJsonParamString("cookie")
+			if success {
+				cookie = temp
+			}
+
+			//生成计时ticket
 			t := tm.GenerateTicket(&model.TicketData {
 				URL:              paramUrl,
 				FileName:         filename,
@@ -181,9 +183,17 @@ func main() {
 				Cookie:           cookie,
 			})
 
+			tObj := tm.GetTicket(t)
 			showJSON(context, 0, "ok", func(params map[string]interface{}) {
 				params["token"] = t
-				params["data"] = tm.GetTicket(t)
+				params["data"] = &map[string]interface{} {
+					"source": tObj.URL,
+					"filename": tObj.FileName,
+					"headers": tObj.Headers,
+					"cookie": tObj.Cookie,
+					"generate_timestamp": tObj.StartTimeStamp,
+					"expire_timestamp": tObj.ExpireTimeStamp,
+				}
 			})
 
 		})
@@ -212,8 +222,8 @@ func main() {
 		})
 	}
 
-	//下载文件接口
-	api.Get("/download/{token:string}", func(context context.Context) {
+	//数据流转发接口
+	api.Get("/stream/{token:string}", func(context context.Context) {
 		token := context.Params().Get("token")
 		if len(token) == 0 {
 			context.StatusCode(400)
@@ -229,60 +239,41 @@ func main() {
 
 		app.Logger().Info("请求文件 -> ", token)
 
-		//创建HTTP请求
-		req, err := http.NewRequest("GET", t.URL, nil)
+		//创建HTTP请求转发器
+		forwarder, err := controller.NewRequestForwarder(app, context, t.URL)
 		if err != nil {
 			context.StatusCode(502)
 			showErrorPage(context, err.Error())
 			return
 		}
 
-		//输出客户端HTTP Request头字段
-		for k, v := range context.Request().Header {
-			req.Header.Set(k, v[0])
-			app.Logger().Debug("Request Header: ", k, " -> ", v[0])
-		}
+		//转发用户HTTP Request头字段到目标网站
+		forwarder.HandleRequestHeader()
 
-		//处理自定义Headers，加入到Request Header
+		//如果设置了自定义Headers, 则额外转发用户设置的自定义Headers字段
 		if t.Headers != nil {
-
-			for i:=0; i< len(t.Headers); i++ {
-				for k, v := range t.Headers[i] {
-					req.Header.Set(k, v.(string))
-					app.Logger().Debug("Custom Request Header: ", k, " -> ", v)
-				}
-			}
-
-			/*for k, v := range t.Headers {
-				req.Header.Set(k, v[0].(string))
-				app.Logger().Debug("Custom Request Header: ", k, " -> ", v)
-			}*/
+			forwarder.SetCustomRequestHeaderMap(t.Headers)
 		}
 
 		//如果设置了自定义Cookie则加入到Request Header
 		if len(t.Cookie) > 0 {
-			req.Header.Set("Cookie", t.Cookie)
+			forwarder.SetCustomRequestHeader("Cookie", t.Cookie)
 		}
 
 		//发出HTTP请求
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
+		if err := forwarder.Do(); err != nil {
 			context.StatusCode(502)
 			showErrorPage(context, err.Error())
 			return
 		}
 
 		//转发HTTP状态码
-		context.StatusCode(resp.StatusCode)
-		app.Logger().Debug("状态码->", resp.StatusCode)
+		context.StatusCode(forwarder.GetStatusCode())
+		app.Logger().Debug("状态码->", forwarder.GetStatusCode())
 
 		//转发Response Header
-		for k, v := range resp.Header {
-			if k != "Server" {
-				context.Header(k, v[0])
-			}
-			app.Logger().Debug("Response Header: ", k, " -> ", v[0])
-		}
+		forwarder.HandleResponseHeader()
+
 		//自定义文件名
 		if len(t.FileName) > 0 {
 			context.Header("content-disposition", "attachment; filename=\""+t.FileName+"\"")
@@ -290,7 +281,7 @@ func main() {
 
 		app.Logger().Debug("token->", token, ", 开始转发数据流")
 		//len, err := io.Copy(context, resp.Body)
-		len, err := io2.Copy(context, resp.Body)
+		len, err := io2.Copy(context, forwarder.GetBody())
 		if err != nil {
 			app.Logger().Debug("token->", token, ", IO错误, 详细信息->", err.Error())
 		}
@@ -329,3 +320,4 @@ func showJSON(context context.Context, code int, message string, cbk func (map[s
 	}
 	context.JSON(data)
 }
+

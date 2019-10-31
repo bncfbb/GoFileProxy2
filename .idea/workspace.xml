@@ -3,9 +3,10 @@
   <component name="ChangeListManager">
     <list default="true" id="0e5d77dc-1d71-45d8-9ac6-02c95b4b0a9c" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build_all.bat" beforeDir="false" afterPath="$PROJECT_DIR$/build_all.bat" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/main.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ticket/model/data.go" beforeDir="false" afterPath="$PROJECT_DIR$/ticket/model/data.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/www/css/style.css" beforeDir="false" afterPath="$PROJECT_DIR$/www/css/style.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ticket/model/data.go" beforeDir="false" afterPath="$PROJECT_DIR$/model/data.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ticket/ticket.go" beforeDir="false" afterPath="$PROJECT_DIR$/controller/ticket.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/www/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/www/index.html" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -47,6 +48,12 @@
     <property name="nodejs_interpreter_path.stuck_in_default_project" value="undefined stuck path" />
     <property name="nodejs_npm_path_reset_for_default_project" value="true" />
     <property name="settings.editor.selected.configurable" value="vcs.Git" />
+  </component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="D:\Codes\GolangProject\FileProxy2" />
+      <recent name="D:\Codes\GolangProject\FileProxy2\controller" />
+    </key>
   </component>
   <component name="RunDashboard">
     <option name="ruleStates">
