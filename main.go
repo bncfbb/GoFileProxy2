@@ -18,13 +18,15 @@ import (
 )
 
 const (
-	Version = "2.0.2"
+	Version = "2.0.3"
 )
 
 var (
 	cookieNameForSessionID ="sessionid"
 	sess = sessions.New(sessions.Config{Cookie:cookieNameForSessionID})
 	counterLock sync.Mutex
+
+	buffsize int64
 )
 
 func main() {
@@ -33,6 +35,7 @@ func main() {
 	ticketTimeout := flag.Int("timeout", 3600, "下载链接超时时间(秒)")
 	isDebug := flag.Bool("debug", false, "是否启用log调试模式(true或false), 默认为false")
 	listen := flag.String("listen", "[::]:8099", "设置监听地址")
+	buffsize := *flag.Int64("buffersize", 8192, "缓冲区大小")
 
 	flag.Parse()
 
@@ -42,7 +45,9 @@ func main() {
 	app := iris.New()
 	app.Logger().Info("下载链接超时时间 -> ", *ticketTimeout)
 
-	app.Logger().SetLevel("debug")
+	app.Logger().Info("数据流转发缓冲区大小 -> ", buffsize)
+
+	//app.Logger().SetLevel("debug")
 	if *isDebug {
 		app.Logger().SetLevel("debug")
 		app.Logger().Info("开启log debug模式")
@@ -280,13 +285,13 @@ func main() {
 		}
 
 		app.Logger().Debug("token->", token, ", 开始转发数据流")
-		//len, err := io.Copy(context, resp.Body)
-		len, err := io2.Copy(context, forwarder.GetBody())
+
+		l, err := io2.Copy(context, forwarder.GetBody(), buffsize)
 		if err != nil {
 			app.Logger().Debug("token->", token, ", IO错误, 详细信息->", err.Error())
 		}
 
-		app.Logger().Debug("token->", token, ", 数据流关闭, len->", len)
+		app.Logger().Debug("token->", token, ", 数据流关闭, len->", l)
 
 		counterLock.Lock()
 		t.DownloadCounter++
@@ -296,7 +301,7 @@ func main() {
 	//api.Get("/download/{token:string}/{filename:string}", download)
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	app.StaticWeb("/", "./www")
+	app.HandleDir("/", "./www")
 
 	// 自定义错误页面
 	app.RegisterView(iris.HTML("./views", ".html"))
