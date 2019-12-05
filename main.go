@@ -27,6 +27,8 @@ var (
 	counterLock sync.Mutex
 
 	buffsize int64
+
+	domain string
 )
 
 func main() {
@@ -34,8 +36,16 @@ func main() {
 
 	ticketTimeout := flag.Int("timeout", 3600, "下载链接超时时间(秒)")
 	isDebug := flag.Bool("debug", false, "是否启用log调试模式(true或false), 默认为false")
-	listen := flag.String("listen", "[::]:8099", "设置监听地址")
 	buffsize := *flag.Int64("buffersize", 8192, "缓冲区大小")
+	listen := flag.String("listen", "[::]:8099", "设置监听地址")
+
+	autoHttps := flag.Bool("auto-https", false, "是否启用自动获取HTTPS SSL证书(true或false), 默认为false")
+	domain := flag.String("domain", "", "站点域名, 启用自动获取HTTPS SSL证书时需要填写")
+	email := flag.String("email", "", "邮箱, 启用自动获取HTTPS SSL证书时需要填写")
+
+	https := flag.Bool("https", false, "是否启用手动https(true或false), 默认为false, 启用时需要填写cert和key参数")
+	cert := flag.String("cert", "", "SSL证书, 启用手动https需要")
+	key := flag.String("key", "", "SSL 私钥, 启用手动https需要")
 
 	flag.Parse()
 
@@ -305,7 +315,30 @@ func main() {
 
 	// 自定义错误页面
 	app.RegisterView(iris.HTML("./views", ".html"))
-	app.Run(iris.Addr(*listen))
+
+	if *autoHttps {
+		if len(*domain)==0 {
+			app.Logger().Fatal("启用auto https需要填写domain")
+			return
+		}
+		if len(*email)==0 {
+			app.Logger().Fatal("启用auto https需要填写email")
+			return
+		}
+		app.Run(iris.AutoTLS(*listen, *domain, *email))
+	} else {
+		if *https {
+			if len(*cert)==0 {
+				app.Logger().Fatal("启用https需要填写cert")
+				return
+			}
+			if len(*key)==0 {
+				app.Logger().Fatal("启用https需要填写key")
+				return
+			}
+		}
+		app.Run(iris.TLS(*listen, *cert, *key))
+	}
 }
 
 func showErrorPage(context context.Context, message string) {
