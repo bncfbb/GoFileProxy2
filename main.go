@@ -336,8 +336,10 @@ func main() {
 				app.Logger().Fatal("启用https需要填写key")
 				return
 			}
+			app.Run(iris.TLS(*listen, *cert, *key))
+			return
 		}
-		app.Run(iris.TLS(*listen, *cert, *key))
+		app.Run(iris.Addr(*listen))
 	}
 }
 
