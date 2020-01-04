@@ -1,7 +1,7 @@
 # What's GoProxy2
 GoProxy2 is a reverse proxy for speeding up file download program.
 
-# Get Start
+# Get Started
 Help param
 
 * Usage of FileProxy2:
@@ -17,3 +17,6 @@ Examples
 
 * `./goproxy2`
 * `./goproxy2 -timeout=7200 -listen=0.0.0.0:8080 -denug=true`
+
+#Demo
+https://proxy.c4code.cn
